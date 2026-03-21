@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useState } from "react";
 import { User, UserRole, AuthContextType } from "../types";
+import { API_BASE_URL } from "../config/api";
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -16,8 +17,6 @@ type LoginResponse = {
   user: ApiUser;
   message?: string;
 };
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 const toUiUser = (apiUser: ApiUser): User => ({
   id: String(apiUser.id),

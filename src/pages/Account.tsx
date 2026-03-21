@@ -4,6 +4,7 @@ import { LogOut, Heart, Package, Settings } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../hooks/useContext";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../config/api";
 
 type AccountOrder = {
   id: number;
@@ -12,8 +13,6 @@ type AccountOrder = {
   status: string;
   created_at: string;
 };
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 export default function AccountPage() {
   const { user, logout } = useAuth();

@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../hooks/useContext";
 import { useNavigate } from "react-router-dom";
 import { useProducts } from "../context/ProductContext";
+import { API_BASE_URL } from "../config/api";
 
 type DashboardUser = {
   id: number;
@@ -20,8 +21,6 @@ type DashboardOrder = {
   items_count: number;
   status: string;
 };
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();

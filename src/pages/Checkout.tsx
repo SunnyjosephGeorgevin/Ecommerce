@@ -5,8 +5,7 @@ import { CheckCircle, ArrowRight } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { useCart } from "../hooks/useContext";
 import { useAuth } from "../hooks/useContext";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { API_BASE_URL } from "../config/api";
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
