@@ -85,10 +85,19 @@ seed_defaults()
 
 app = FastAPI(title="E-commerce API", version="1.0.0")
 
+
+def get_allowed_frontend_origins() -> list[str]:
+    # Comma-separated origins can be provided in Render as FRONTEND_ORIGINS.
+    raw = os.getenv("FRONTEND_ORIGINS", "https://ecommercefrontend-9dmu.onrender.com")
+    return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
+
+allowed_frontend_origins = get_allowed_frontend_origins()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_origins=[],
+    allow_origins=allowed_frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
