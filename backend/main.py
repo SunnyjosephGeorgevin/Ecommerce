@@ -24,6 +24,7 @@ from backend.routes.seller import router as seller_router
 from backend.routes.users import router as users_router
 
 from backend.routes.agent import router as agent_router
+from backend.seed_products import products as full_seed_products
 
 from backend.models.user_behavior import UserBehavior
 
@@ -91,67 +92,13 @@ def seed_defaults() -> None:
 def seed_demo_products_if_empty() -> None:
     db: Session = SessionLocal()
     try:
-        if db.query(Product).count() > 0:
+        existing_names = {name for (name,) in db.query(Product.name).all()}
+        missing_payloads = [payload for payload in full_seed_products if payload["name"] not in existing_names]
+
+        if not missing_payloads:
             return
 
-        demo_products = [
-            {
-                "name": "Nike Air Max 90",
-                "price": 199,
-                "category": "sneakers",
-                "image_url": "https://loremflickr.com/600/600/sneaker,nike",
-                "description": "Classic Nike running sneakers with superior comfort",
-                "stock": 20,
-                "seller_id": 1,
-            },
-            {
-                "name": "Apple Watch Series 9",
-                "price": 400,
-                "category": "accessories",
-                "image_url": "https://loremflickr.com/600/600/smartwatch,apple",
-                "description": "Advanced smartwatch with health tracking",
-                "stock": 15,
-                "seller_id": 1,
-            },
-            {
-                "name": "Nike Sports Hoodie",
-                "price": 80,
-                "category": "apparel",
-                "image_url": "https://loremflickr.com/600/600/hoodie,nike",
-                "description": "Comfortable hoodie for workouts and casual wear",
-                "stock": 25,
-                "seller_id": 1,
-            },
-            {
-                "name": "MacBook Air M2",
-                "price": 1199,
-                "category": "laptop",
-                "image_url": "https://loremflickr.com/600/600/macbook,air",
-                "description": "Lightweight and incredibly thin with great battery life",
-                "stock": 12,
-                "seller_id": 1,
-            },
-            {
-                "name": "Samsung Galaxy S24",
-                "price": 799,
-                "category": "mobile",
-                "image_url": "https://loremflickr.com/600/600/phone,samsung",
-                "description": "Compact flagship with Galaxy AI features",
-                "stock": 18,
-                "seller_id": 1,
-            },
-            {
-                "name": "Men's Tailored Navy Suit",
-                "price": 350,
-                "category": "fashion",
-                "image_url": "https://loremflickr.com/600/600/suit,mens",
-                "description": "Classic two-piece slim-fit navy suit",
-                "stock": 10,
-                "seller_id": 1,
-            },
-        ]
-
-        db.add_all([Product(**payload) for payload in demo_products])
+        db.add_all([Product(**payload) for payload in missing_payloads])
         db.commit()
     finally:
         db.close()

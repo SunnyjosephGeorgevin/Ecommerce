@@ -7,12 +7,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.database import SessionLocal
 from backend.models.product import Product
 
-db = SessionLocal()
-
-# Optional: clear existing products
-db.query(Product).delete()
-db.commit()
-
 products = [
     # 👟 SNEAKERS (20)
     {"name": "Nike Air Max 90", "price": 199, "category": "sneakers", "image_url": "https://loremflickr.com/600/600/sneaker,nike", "description": "Classic Nike running sneakers with superior comfort", "stock": 20, "seller_id": 1},
@@ -147,9 +141,22 @@ products = [
     {"name": "Faux Fur Coat", "price": 160, "category": "fashion", "image_url": "https://loremflickr.com/600/600/coat,fur", "description": "Glamorous and warm statement outerwear", "stock": 11, "seller_id": 1},
 ]
 
-# Insert into DB
-for p in products:
-    db.add(Product(**p))
+def seed_products(clear_existing: bool = True) -> int:
+    db = SessionLocal()
+    try:
+        if clear_existing:
+            db.query(Product).delete()
+            db.commit()
 
-db.commit()
-print("✅Products inserted successfully!")
+        for payload in products:
+            db.add(Product(**payload))
+
+        db.commit()
+        return len(products)
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    count = seed_products(clear_existing=True)
+    print(f"Products inserted successfully: {count}")
