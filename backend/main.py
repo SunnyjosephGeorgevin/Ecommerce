@@ -10,7 +10,7 @@ if PARENT_DIR not in sys.path:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from backend.database import Base, SessionLocal, engine
@@ -35,13 +35,14 @@ Base.metadata.create_all(bind=engine)
 def ensure_schema() -> None:
     db: Session = SessionLocal()
     try:
-        result = db.execute(text("PRAGMA table_info(users)"))
-        columns = [row[1] for row in result.fetchall()]
+        inspector = inspect(engine)
+        columns = [column["name"] for column in inspector.get_columns("users")]
 
         if "is_approved" not in columns:
+            default_true = "1" if engine.dialect.name == "sqlite" else "TRUE"
             db.execute(
                 text(
-                    "ALTER TABLE users ADD COLUMN is_approved BOOLEAN NOT NULL DEFAULT 1"
+                    f"ALTER TABLE users ADD COLUMN is_approved BOOLEAN NOT NULL DEFAULT {default_true}"
                 )
             )
             db.commit()
