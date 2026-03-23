@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Plus, Minus, Trash2, ArrowLeft, ShoppingBag } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useCart } from "../hooks/useContext";
@@ -7,10 +8,31 @@ import { useCart } from "../hooks/useContext";
 export default function CartPage() {
   const navigate = useNavigate();
   const { cart, removeFromCart, updateCartItem, clearCart, cartTotal } = useCart();
+  const [promoCode, setPromoCode] = useState("");
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoMessage, setPromoMessage] = useState("");
 
   const shippingCost = cartTotal > 100 ? 0 : 15;
   const taxCost = Math.round(cartTotal * 0.08 * 100) / 100;
-  const finalTotal = cartTotal + shippingCost + taxCost;
+  const finalTotal = cartTotal + shippingCost + taxCost - promoDiscount;
+
+  const applyPromoCode = () => {
+    const normalized = promoCode.trim().toUpperCase();
+    if (normalized === "SAVE10") {
+      const discount = Math.round(cartTotal * 0.1 * 100) / 100;
+      setPromoDiscount(discount);
+      setPromoMessage(`Applied SAVE10: You saved $${discount.toFixed(2)}`);
+      return;
+    }
+    if (normalized === "FREESHIP") {
+      const discount = shippingCost;
+      setPromoDiscount(discount);
+      setPromoMessage(`Applied FREESHIP: You saved $${discount.toFixed(2)}`);
+      return;
+    }
+    setPromoDiscount(0);
+    setPromoMessage("Promo code not recognized. Try SAVE10 or FREESHIP");
+  };
 
   if (cart.items.length === 0) {
     return (
@@ -61,6 +83,16 @@ export default function CartPage() {
           </div>
         </motion.div>
 
+        <div className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+          <div className="flex items-center gap-2 text-xs sm:text-sm">
+            <span className="rounded-full bg-rose-500 text-white px-3 py-1 font-semibold">1. Cart</span>
+            <span className="text-slate-500">{"->"}</span>
+            <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-300">2. Checkout</span>
+            <span className="text-slate-500">{"->"}</span>
+            <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-300">3. Confirmation</span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
@@ -76,6 +108,12 @@ export default function CartPage() {
                   src={item.product.image}
                   alt={item.product.name}
                   className="w-32 h-32 object-cover rounded-lg"
+                  onError={(e) => {
+                    const fallback = `https://picsum.photos/seed/${encodeURIComponent(item.product.name)}/900/900`;
+                    if (e.currentTarget.src !== fallback) {
+                      e.currentTarget.src = fallback;
+                    }
+                  }}
                 />
 
                 <div className="flex-1">
@@ -144,6 +182,12 @@ export default function CartPage() {
                 <span>Tax (8%)</span>
                 <span>${taxCost.toFixed(2)}</span>
               </div>
+              {promoDiscount > 0 && (
+                <div className="flex justify-between text-emerald-400">
+                  <span>Promo Discount</span>
+                  <span>- ${promoDiscount.toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between items-center mb-6 text-xl font-bold">
@@ -182,12 +226,18 @@ export default function CartPage() {
                 <input
                   type="text"
                   placeholder="Promo code"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
                   className="flex-1 bg-[#0B0B0D] border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#C8102E]"
                 />
-                <button className="bg-[#C8102E] text-white px-3 py-2 rounded font-semibold text-sm hover:bg-[#a00a25] transition">
+                <button onClick={applyPromoCode} className="bg-[#C8102E] text-white px-3 py-2 rounded font-semibold text-sm hover:bg-[#a00a25] transition">
                   Apply
                 </button>
               </div>
+              {promoMessage && (
+                <p className={`mt-2 text-xs ${promoDiscount > 0 ? "text-emerald-400" : "text-amber-400"}`}>{promoMessage}</p>
+              )}
+              <p className="mt-2 text-[11px] text-slate-500">Tip: Try SAVE10 or FREESHIP</p>
             </div>
           </motion.div>
         </div>

@@ -55,7 +55,7 @@ export default function LoginPage() {
       >
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-black mb-2">AI SHOP</h1>
+          <h1 className="text-5xl font-black mb-2">SpectraCart</h1>
           <p className="text-gray-400">Premium E-Commerce Platform</p>
         </div>
 

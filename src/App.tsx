@@ -12,6 +12,7 @@ import Account from "./pages/Account";
 import SellerDashboard from "./pages/SellerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import { useAuth } from "./hooks/useContext";
+import Chatbot from "./components/Chatbot";
 
 export default function App() {
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
@@ -51,6 +52,7 @@ export default function App() {
       </Routes>
 
       <CartDrawer isOpen={isCartDrawerOpen} onClose={() => setIsCartDrawerOpen(false)} />
+      <Chatbot />
     </>
   );
 }

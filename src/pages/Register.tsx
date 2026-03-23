@@ -53,7 +53,7 @@ export default function RegisterPage() {
       >
         <div className="text-center mb-12">
           <h1 className="text-5xl font-black mb-2">CREATE ACCOUNT</h1>
-          <p className="text-gray-400">Join AI SHOP as Buyer or Seller</p>
+          <p className="text-gray-400">Join SpectraCart as Buyer or Seller</p>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-6">

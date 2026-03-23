@@ -221,6 +221,13 @@ export default function SellerDashboard() {
                 <img
                   src={product.image}
                   className="w-16 h-16 object-cover rounded"
+                  alt={product.name}
+                  onError={(e) => {
+                    const fallback = `https://picsum.photos/seed/${encodeURIComponent(product.name)}/900/900`;
+                    if (e.currentTarget.src !== fallback) {
+                      e.currentTarget.src = fallback;
+                    }
+                  }}
                 />
 
                 <div className="flex-1">

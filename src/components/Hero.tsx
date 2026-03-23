@@ -1,8 +1,48 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useProducts } from "../context/ProductContext";
+
+type HeroSlide = {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  productId?: string;
+};
+
+const heroFallbackProducts: HeroSlide[] = [
+  {
+    id: "hero-1",
+    name: "Nike Air Max 90",
+    price: 199,
+    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "hero-2",
+    name: "MacBook Pro 16-inch",
+    price: 2499,
+    image: "https://images.unsplash.com/photo-1517336714739-489689fd1ca8?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "hero-3",
+    name: "Samsung Galaxy S24 Ultra",
+    price: 1299,
+    image: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "hero-4",
+    name: "Apple Watch Series 9",
+    price: 400,
+    image: "https://images.unsplash.com/photo-1579586337278-3f436f25d4d6?auto=format&fit=crop&w=900&q=80",
+  },
+];
 
 export default function Hero() {
   const navigate = useNavigate();
+  const { products } = useProducts();
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -28,6 +68,69 @@ export default function Hero() {
       scale: 1,
       transition: { duration: 1, ease: "easeOut" },
     },
+  };
+
+  const heroProducts = useMemo<HeroSlide[]>(() => {
+    const curated = products
+      .filter((product) => product.inStock && product.image)
+      .slice(0, 8)
+      .map((product): HeroSlide => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
+        productId: product.id,
+      }));
+
+    return curated.length > 0 ? curated : heroFallbackProducts;
+  }, [products]);
+
+  useEffect(() => {
+    if (activeIndex >= heroProducts.length) {
+      setActiveIndex(0);
+    }
+  }, [heroProducts.length, activeIndex]);
+
+  useEffect(() => {
+    if (heroProducts.length <= 1) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % heroProducts.length);
+    }, 4500);
+
+    return () => window.clearInterval(timer);
+  }, [heroProducts.length]);
+
+  const activeProduct = heroProducts[activeIndex] ?? heroFallbackProducts[0];
+
+  const showNext = () => {
+    setActiveIndex((prev) => (prev + 1) % heroProducts.length);
+  };
+
+  const showPrev = () => {
+    setActiveIndex((prev) => (prev - 1 + heroProducts.length) % heroProducts.length);
+  };
+
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number } }) => {
+    if (info.offset.x < -60) {
+      showNext();
+      return;
+    }
+
+    if (info.offset.x > 60) {
+      showPrev();
+    }
+  };
+
+  const handleHeroImageClick = () => {
+    if (activeProduct.productId) {
+      navigate(`/product/${activeProduct.productId}`);
+      return;
+    }
+
+    navigate("/shop");
   };
 
   return (
@@ -117,42 +220,72 @@ export default function Hero() {
               }}
               transition={{ duration: 3, repeat: Infinity }}
             />
-            <img
-              src="https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?w=600&h=700&fit=crop"
-              alt="Premium Sneaker"
-              className="w-full rounded-2xl shadow-2xl relative z-10"
-            />
+
+            <button
+              type="button"
+              onClick={handleHeroImageClick}
+              className="relative z-10 w-full overflow-hidden rounded-2xl shadow-2xl text-left group"
+              aria-label={`Open ${activeProduct.name} details`}
+            >
+              <AnimatePresence mode="wait">
+                <motion.img
+                  key={activeProduct.id}
+                  src={activeProduct.image}
+                  alt={activeProduct.name}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  onDragEnd={handleDragEnd}
+                  initial={{ opacity: 0, x: 40 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -40 }}
+                  transition={{ duration: 0.35 }}
+                  className="w-full aspect-[5/6] object-cover cursor-grab active:cursor-grabbing group-hover:scale-[1.01] transition-transform duration-300"
+                  onError={(e) => {
+                    e.currentTarget.src = heroFallbackProducts[0].image;
+                  }}
+                />
+              </AnimatePresence>
+
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/45 to-transparent px-4 py-4">
+                <p className="text-white font-bold text-lg leading-tight truncate">{activeProduct.name}</p>
+                <p className="text-[#F4B8C4] font-semibold mt-1">${activeProduct.price}</p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={showPrev}
+              className="absolute top-1/2 left-3 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/45 border border-white/20 text-white flex items-center justify-center hover:bg-[#C8102E] transition"
+              aria-label="Previous product"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={showNext}
+              className="absolute top-1/2 right-3 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/45 border border-white/20 text-white flex items-center justify-center hover:bg-[#C8102E] transition"
+              aria-label="Next product"
+            >
+              <ChevronRight size={18} />
+            </button>
+
+            <div className="absolute -bottom-9 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+              {heroProducts.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  className={`h-1.5 rounded-full transition-all ${
+                    index === activeIndex ? "w-8 bg-[#C8102E]" : "w-3 bg-white/35"
+                  }`}
+                  aria-label={`Show ${item.name}`}
+                />
+              ))}
+            </div>
           </div>
 
-          {/* Floating cards */}
-          <motion.div
-            className="absolute -bottom-6 -left-2 sm:-left-6 bg-white text-black p-4 rounded-lg shadow-lg z-20"
-            animate={{ y: [0, -10, 0] }}
-            transition={{ duration: 3, repeat: Infinity }}
-          >
-            <p className="font-bold text-lg">Free Shipping</p>
-            <p className="text-sm text-gray-600">On orders over $100</p>
-          </motion.div>
         </motion.div>
       </div>
-
-      {/* Scroll indicator */}
-      <motion.div
-        className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10"
-        animate={{ y: [0, 10, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        <div className="flex flex-col items-center gap-2">
-          <span className="text-xs text-gray-500 tracking-widest">SCROLL TO EXPLORE</span>
-          <div className="w-6 h-10 border-2 border-[#C8102E] rounded-full flex justify-center">
-            <motion.div
-              className="w-1 h-2 bg-[#C8102E] rounded-full mt-2"
-              animate={{ y: [0, 8, 0] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-          </div>
-        </div>
-      </motion.div>
     </section>
   );
 }

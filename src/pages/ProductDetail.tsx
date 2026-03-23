@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Heart, Share2, Truck, RotateCcw, ShieldCheck, ChevronLeft } from "lucide-react";
@@ -16,6 +16,16 @@ export default function ProductDetailPage() {
   const [selectedSize, setSelectedSize] = useState("M");
 
   const product = products.find((p) => p.id === id);
+
+  useEffect(() => {
+    if (!product || typeof window === "undefined") {
+      return;
+    }
+    const recent = localStorage.getItem("recentlyViewedProducts");
+    const parsed: string[] = recent ? JSON.parse(recent) : [];
+    const updated = [product.id, ...parsed.filter((item) => item !== product.id)].slice(0, 12);
+    localStorage.setItem("recentlyViewedProducts", JSON.stringify(updated));
+  }, [product]);
 
   if (!product) {
     return (
@@ -57,7 +67,7 @@ export default function ProductDetailPage() {
           <span className="font-medium">Back</span>
         </motion.button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
           {/* Images */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -69,7 +79,13 @@ export default function ProductDetailPage() {
                 key={selectedImage}
                 src={images[selectedImage]}
                 alt={product.name}
-                className="w-full aspect-square object-cover"
+                className="w-full aspect-square object-cover hover:scale-110 transition-transform duration-500 cursor-zoom-in"
+                onError={(e) => {
+                  const fallback = `https://picsum.photos/seed/${encodeURIComponent(product.name)}/900/900`;
+                  if (e.currentTarget.src !== fallback) {
+                    e.currentTarget.src = fallback;
+                  }
+                }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
@@ -91,7 +107,17 @@ export default function ProductDetailPage() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={img}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const fallback = `https://picsum.photos/seed/${encodeURIComponent(product.name)}-${idx}/900/900`;
+                      if (e.currentTarget.src !== fallback) {
+                        e.currentTarget.src = fallback;
+                      }
+                    }}
+                  />
                 </motion.button>
               ))}
             </div>
@@ -102,6 +128,7 @@ export default function ProductDetailPage() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
+            className="lg:sticky lg:top-24"
           >
             <div className="mb-6">
               <span className="text-[#C8102E] text-sm font-semibold tracking-widest">{product.category.toUpperCase()}</span>
@@ -228,6 +255,9 @@ export default function ProductDetailPage() {
                 <ShieldCheck size={20} className="text-[#C8102E]" />
                 <span>Authentic guaranteed</span>
               </div>
+              <div className="rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm text-slate-300">
+                Estimated delivery: <span className="text-white font-semibold">2-4 business days</span>
+              </div>
             </div>
 
             {/* Seller Info */}
@@ -269,6 +299,22 @@ export default function ProductDetailPage() {
               ))}
           </div>
         </motion.div>
+      </div>
+
+      {/* Mobile Sticky CTA */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-700 bg-[#0b0f1a]/95 backdrop-blur p-3 lg:hidden">
+        <div className="mx-auto max-w-7xl flex items-center gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-slate-400">Total</p>
+            <p className="text-lg font-bold text-white truncate">${product.price}</p>
+          </div>
+          <button
+            onClick={handleAddToCart}
+            className="ml-auto premium-button-primary py-2 px-5"
+          >
+            Add to Cart
+          </button>
+        </div>
       </div>
     </div>
   );

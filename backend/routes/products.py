@@ -9,9 +9,25 @@ from backend.schemas.product import ProductCreate, ProductOut
 router = APIRouter(tags=["products"])
 
 
+CATEGORY_ALIASES = {
+    "footwear": ["footwear", "sneakers"],
+    "fashion": ["fashion", "apparel"],
+}
+
+
 @router.get("/products", response_model=list[ProductOut])
-def get_products(db: Session = Depends(get_db)):
-    return db.query(Product).order_by(Product.created_at.desc()).all()
+def get_products(category: str | None = None, db: Session = Depends(get_db)):
+    query = db.query(Product)
+
+    if category:
+        normalized_category = category.strip().lower()
+        mapped_categories = CATEGORY_ALIASES.get(normalized_category)
+        if mapped_categories:
+            query = query.filter(Product.category.in_(mapped_categories))
+        else:
+            query = query.filter(Product.category == normalized_category)
+
+    return query.order_by(Product.created_at.desc()).all()
 
 
 @router.get("/products/{product_id}", response_model=ProductOut)

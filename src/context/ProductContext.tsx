@@ -1,4 +1,4 @@
-import { ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
+import { ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Product } from "../types";
 import { API_BASE_URL } from "../config/api";
 
@@ -6,7 +6,7 @@ type ProductContextType = {
   products: Product[];
   loading: boolean;
   error: string | null;
-  fetchProducts: () => Promise<void>;
+  fetchProducts: (category?: string) => Promise<void>;
   addProduct: (product: Product) => Promise<void>;
 };
 
@@ -44,22 +44,38 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (category?: string) => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/products`);
+      const query = new URLSearchParams();
+      if (category) {
+        query.set("category", category);
+      }
+      const endpoint = query.toString() ? `${API_BASE_URL}/products?${query.toString()}` : `${API_BASE_URL}/products`;
+
+      const response = await fetch(endpoint);
       if (!response.ok) {
         throw new Error(`Failed to fetch products: ${response.status}`);
       }
       const data: ApiProduct[] = await response.json();
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
       setProducts(data.map(mapApiProductToUiProduct));
     } catch (err) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
       const message = err instanceof Error ? err.message : "Failed to fetch products";
       setError(message);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 

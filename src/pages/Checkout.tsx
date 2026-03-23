@@ -38,6 +38,20 @@ export default function CheckoutPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const fillSavedAddress = () => {
+    setFormData((prev) => ({
+      ...prev,
+      firstName: prev.firstName || "Alex",
+      lastName: prev.lastName || "Morgan",
+      email: prev.email || "alex@example.com",
+      phone: prev.phone || "+1 555 010 100",
+      address: prev.address || "221 Market Street",
+      city: prev.city || "San Francisco",
+      state: prev.state || "CA",
+      zip: prev.zip || "94105",
+    }));
+  };
+
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -185,6 +199,16 @@ export default function CheckoutPage() {
           <h1 className="text-5xl md:text-6xl font-black mt-2">Checkout</h1>
         </motion.div>
 
+        <div className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+          <div className="flex items-center gap-2 text-xs sm:text-sm">
+            <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-300">1. Cart</span>
+            <span className="text-slate-500">{"->"}</span>
+            <span className="rounded-full bg-rose-500 text-white px-3 py-1 font-semibold">2. Checkout</span>
+            <span className="text-slate-500">{"->"}</span>
+            <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-300">3. Confirmation</span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Checkout Form */}
           <motion.div
@@ -195,7 +219,12 @@ export default function CheckoutPage() {
             <form onSubmit={handlePayment} className="space-y-6">
               {/* Shipping Information */}
               <div className="bg-[#1a1a1f] border border-gray-800 rounded-lg p-6">
-                <h2 className="text-xl font-bold mb-4">Shipping Information</h2>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-xl font-bold">Shipping Information</h2>
+                  <button type="button" onClick={fillSavedAddress} className="text-xs rounded-full border border-slate-600 px-3 py-1 text-slate-300 hover:border-rose-500/70">
+                    Use saved address
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <input
                     type="text"
@@ -224,6 +253,9 @@ export default function CheckoutPage() {
                     required
                     className="col-span-2 bg-[#0B0B0D] border border-gray-700 rounded px-4 py-2 focus:outline-none focus:border-[#C8102E] text-white"
                   />
+                  {formData.email && !formData.email.includes("@") && (
+                    <p className="col-span-2 text-xs text-amber-400">Please enter a valid email address.</p>
+                  )}
                   <input
                     type="tel"
                     name="phone"
@@ -269,6 +301,9 @@ export default function CheckoutPage() {
                     required
                     className="bg-[#0B0B0D] border border-gray-700 rounded px-4 py-2 focus:outline-none focus:border-[#C8102E] text-white"
                   />
+                  {formData.zip && formData.zip.length < 5 && (
+                    <p className="col-span-2 text-xs text-amber-400">ZIP code should be at least 5 characters.</p>
+                  )}
                 </div>
               </div>
 
@@ -286,6 +321,9 @@ export default function CheckoutPage() {
                     maxLength={19}
                     className="w-full bg-[#0B0B0D] border border-gray-700 rounded px-4 py-2 focus:outline-none focus:border-[#C8102E] text-white"
                   />
+                  {formData.cardNumber && formData.cardNumber.replace(/\s/g, "").length < 16 && (
+                    <p className="text-xs text-amber-400">Card number should contain 16 digits.</p>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <input
                       type="text"
