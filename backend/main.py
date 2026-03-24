@@ -14,12 +14,16 @@ from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from backend.database import Base, SessionLocal, engine
+from backend.models.feedback import Feedback
 from backend.models.user import User
 from backend.models.product import Product
 from backend.routes.auth import hash_password
 from backend.routes.auth import router as auth_router
+from backend.routes.behavior import router as behavior_router
+from backend.routes.feedback import router as feedback_router
 from backend.routes.orders import router as orders_router
 from backend.routes.products import router as products_router
+from backend.routes.recommendations import router as recommendations_router
 from backend.routes.seller import router as seller_router
 from backend.routes.users import router as users_router
 
@@ -47,6 +51,23 @@ def ensure_schema() -> None:
                 )
             )
             db.commit()
+
+        if "user_behavior" in inspector.get_table_names():
+            behavior_columns = [
+                column["name"] for column in inspector.get_columns("user_behavior")
+            ]
+
+            if "score" not in behavior_columns:
+                db.execute(text("ALTER TABLE user_behavior ADD COLUMN score FLOAT NOT NULL DEFAULT 1"))
+                db.commit()
+
+            if "session_id" not in behavior_columns:
+                db.execute(text("ALTER TABLE user_behavior ADD COLUMN session_id VARCHAR(120)"))
+                db.commit()
+
+            if "context_json" not in behavior_columns:
+                db.execute(text("ALTER TABLE user_behavior ADD COLUMN context_json TEXT"))
+                db.commit()
     finally:
         db.close()
 
@@ -148,3 +169,6 @@ app.include_router(products_router)
 app.include_router(orders_router)
 app.include_router(seller_router)
 app.include_router(agent_router)
+app.include_router(behavior_router)
+app.include_router(feedback_router)
+app.include_router(recommendations_router)
