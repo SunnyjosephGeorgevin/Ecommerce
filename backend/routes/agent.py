@@ -278,6 +278,52 @@ def log_agent_quality_event(
         db.rollback()
 
 
+def apply_active_filters_to_products(products: list[Product], filters: dict) -> list[Product]:
+    category = filters.get("category")
+    min_price = filters.get("min_price")
+    max_price = filters.get("max_price")
+
+    filtered = [product for product in products if product.stock > 0]
+
+    if category:
+        if category == "electronics":
+            filtered = [p for p in filtered if p.category in {"mobile", "laptop"}]
+        else:
+            filtered = [p for p in filtered if p.category == category]
+
+    if min_price is not None:
+        filtered = [p for p in filtered if p.price >= min_price]
+
+    if max_price is not None:
+        filtered = [p for p in filtered if p.price <= max_price]
+
+    return filtered
+
+
+def build_relaxed_recommendations(db: Session, user_query: str, filters: dict, limit: int = 5) -> list[Product]:
+    relaxed_query = db.query(Product).filter(Product.stock > 0)
+    relaxed_query = apply_category_filter(relaxed_query, filters.get("category"))
+
+    keywords = filters.get("keywords") or []
+    if keywords:
+        conditions = build_keyword_conditions(keywords)
+        if conditions:
+            relaxed_query = relaxed_query.filter(or_(*conditions))
+
+    brands = filters.get("brands") or []
+    if brands:
+        brand_conditions = build_brand_conditions(brands)
+        if brand_conditions:
+            relaxed_query = relaxed_query.filter(or_(*brand_conditions))
+
+    relaxed = relaxed_query.order_by(Product.created_at.desc()).limit(max(limit * 2, 8)).all()
+
+    if not relaxed:
+        relaxed = fallback_similar_products(db, user_query=user_query, limit=max(limit * 2, 8))
+
+    return semantic_rerank(relaxed, user_query, filters.get("category"))[:limit]
+
+
 # 🤖 AGENT ENDPOINT
 @router.post("/query")
 def agent_query(payload: dict, db: Session = Depends(get_db)):
@@ -533,15 +579,28 @@ def agent_query(payload: dict, db: Session = Depends(get_db)):
         recommendations = similar_recommendations or fallback_similar_products(db, user_query=user_query, limit=8)
         recommendations = semantic_rerank(recommendations, user_query, filters.get("category"))[:5]
 
+    # Final guardrail: always enforce active intent filters on recommendation cards.
+    recommendations = apply_active_filters_to_products(recommendations, filters)
+
     merged_recommendations = recommendations
     if not unavailable_mode:
+        filtered_hybrid = apply_active_filters_to_products(hybrid_recommendations, filters)
         merged_recommendations = recommendations + [
             rec
-            for rec in hybrid_recommendations
+            for rec in filtered_hybrid
             if rec.id not in [existing.id for existing in recommendations]
         ]
 
+    merged_recommendations = apply_active_filters_to_products(merged_recommendations, filters)
     merged_recommendations = merged_recommendations[:5]
+
+    if not merged_recommendations:
+        merged_recommendations = build_relaxed_recommendations(
+            db,
+            user_query=user_query,
+            filters=filters,
+            limit=5,
+        )
 
     log_agent_quality_event(
         db=db,
