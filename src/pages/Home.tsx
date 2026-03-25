@@ -4,12 +4,48 @@ import Hero from "../components/Hero";
 import ProductGrid from "../components/ProductGrid";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Truck, RotateCcw, Shield } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useProducts } from "../context/ProductContext";
+import { useAuth } from "../hooks/useContext";
+import { API_BASE_URL } from "../config/api";
+
+type RecommendationProduct = {
+  id: number;
+  name: string;
+  price: number;
+  image_url: string;
+  category?: string;
+};
+
+type RealtimeRecommendationsResponse = {
+  recommendations: RecommendationProduct[];
+};
+
+const getRecommendationReason = (product: { category?: string; price: number }): string => {
+  if (product.category === "mobile" || product.category === "laptop") {
+    return "Because you browse electronics often";
+  }
+
+  if (product.category === "sneakers" || product.category === "footwear") {
+    return "Because you explore footwear trends";
+  }
+
+  if (product.price <= 300) {
+    return "Because you check value picks";
+  }
+
+  if (product.price >= 1200) {
+    return "Because you engage with premium items";
+  }
+
+  return "Because it matches your recent activity";
+};
 
 export default function Home() {
   const navigate = useNavigate();
   const { products } = useProducts();
+  const { user } = useAuth();
+  const [realtimeRecommendations, setRealtimeRecommendations] = useState<RecommendationProduct[]>([]);
 
   const recentProductIds = useMemo(() => {
     if (typeof window === "undefined") return [] as string[];
@@ -28,7 +64,48 @@ export default function Home() {
     [products, trendingCategory]
   );
 
-  const recommended = useMemo(() => products.slice(0, 4), [products]);
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (!user?.id) {
+        setRealtimeRecommendations([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/recommendations/realtime/${user.id}?limit=4`);
+        if (!response.ok) {
+          throw new Error("Failed to load realtime recommendations");
+        }
+
+        const payload = (await response.json()) as RealtimeRecommendationsResponse;
+        setRealtimeRecommendations(payload.recommendations || []);
+      } catch {
+        setRealtimeRecommendations([]);
+      }
+    };
+
+    void fetchRecommendations();
+  }, [user?.id]);
+
+  const recommended = useMemo(() => {
+    if (realtimeRecommendations.length > 0) {
+      return realtimeRecommendations.map((product) => ({
+        id: String(product.id),
+        name: product.name,
+        price: product.price,
+        image: product.image_url,
+        category: product.category,
+      }));
+    }
+
+    return products.slice(0, 4).map((product) => ({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+      category: product.category,
+    }));
+  }, [products, realtimeRecommendations]);
 
   return (
     <div className="bg-[#0B0B0D] text-white min-h-screen">
@@ -47,6 +124,9 @@ export default function Home() {
                   className="text-left rounded-xl border border-slate-800 bg-slate-900/40 p-3 hover:border-rose-500/70 transition"
                 >
                   <img src={product.image} alt={product.name} className="w-full aspect-square object-cover rounded-lg mb-3" />
+                  <p className="mb-2 inline-flex rounded-full border border-rose-500/35 bg-rose-500/10 px-2 py-1 text-[10px] font-semibold text-rose-200">
+                    {getRecommendationReason(product)}
+                  </p>
                   <p className="text-sm font-semibold line-clamp-1">{product.name}</p>
                   <p className="text-rose-300 text-sm mt-1">${product.price}</p>
                 </button>

@@ -22,4 +22,30 @@ const fallbackApiBaseUrl = import.meta.env.DEV
 	? "http://127.0.0.1:8000"
 	: getRuntimeFallbackApiBaseUrl();
 
-export const API_BASE_URL = normalize(configuredApiBaseUrl || fallbackApiBaseUrl);
+export const getApiBaseCandidates = (): string[] => {
+	const candidates = new Set<string>();
+
+	if (configuredApiBaseUrl) {
+		candidates.add(normalize(configuredApiBaseUrl));
+	}
+
+	candidates.add(normalize(fallbackApiBaseUrl));
+
+	if (typeof window !== "undefined") {
+		candidates.add(normalize(window.location.origin));
+
+		const { hostname } = window.location;
+		if (hostname.includes("onrender.com") && hostname.toLowerCase().includes("frontend")) {
+			candidates.add(normalize(`https://${hostname.replace(/frontend/gi, "backend")}`));
+		}
+
+		if (hostname === "localhost" || hostname === "127.0.0.1") {
+			candidates.add("http://127.0.0.1:8000");
+			candidates.add("http://localhost:8000");
+		}
+	}
+
+	return Array.from(candidates);
+};
+
+export const API_BASE_URL = getApiBaseCandidates()[0];

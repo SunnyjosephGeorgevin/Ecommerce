@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, LogOut } from "lucide-react";
 import Navbar from "../components/Navbar";
@@ -6,11 +6,14 @@ import { useAuth } from "../hooks/useContext";
 import { useNavigate } from "react-router-dom";
 import { useProducts } from "../context/ProductContext";
 import { PRODUCT_CATEGORIES } from "../constants/categories";
+import { API_BASE_URL } from "../config/api";
 
 export default function SellerDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { products, addProduct } = useProducts();
+  const [sellerProducts, setSellerProducts] = useState<typeof products>([]);
+  const [sellerProductsLoading, setSellerProductsLoading] = useState(false);
 
   const [showAddProduct, setShowAddProduct] = useState(false);
 
@@ -22,6 +25,52 @@ export default function SellerDashboard() {
     category: "",
     stock: "",
   });
+
+  const fetchSellerProducts = async () => {
+    if (!user) {
+      return;
+    }
+
+    setSellerProductsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/seller/products?seller_id=${user.id}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch seller products");
+      }
+
+      const data: Array<{
+        id: number;
+        name: string;
+        price: number;
+        description: string;
+        image_url: string;
+        category: string;
+        stock: number;
+        seller_id: number;
+      }> = await response.json();
+
+      const mapped = data.map((item) => ({
+        id: String(item.id),
+        name: item.name,
+        price: item.price,
+        image: item.image_url,
+        description: item.description,
+        category: item.category,
+        stock: item.stock,
+        rating: 4,
+        reviews: 0,
+        sellerId: String(item.seller_id),
+        sellerName: user.name,
+        inStock: item.stock > 0,
+      }));
+
+      setSellerProducts(mapped);
+    } catch {
+      setSellerProducts([]);
+    } finally {
+      setSellerProductsLoading(false);
+    }
+  };
 
   if (!user || user.role !== "seller") {
     return (
@@ -64,6 +113,7 @@ export default function SellerDashboard() {
 
     try {
       await addProduct(newProduct);
+      await fetchSellerProducts();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save product";
       alert(message);
@@ -81,6 +131,20 @@ export default function SellerDashboard() {
 
     setShowAddProduct(false);
   };
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    void fetchSellerProducts();
+  }, [user?.id]);
+
+  const visibleProducts = useMemo(() => {
+    if (sellerProducts.length > 0) {
+      return sellerProducts;
+    }
+    return products.filter((product) => product.sellerId === user.id);
+  }, [products, sellerProducts, user.id]);
 
   return (
     <div className="bg-[#0B0B0D] text-white min-h-screen">
@@ -114,20 +178,20 @@ export default function SellerDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <div className="bg-[#1a1a1f] border border-gray-800 rounded-lg p-6">
             <p className="text-gray-400 text-sm">Total Products</p>
-            <p className="text-3xl font-bold mt-2">{products.length}</p>
+            <p className="text-3xl font-bold mt-2">{visibleProducts.length}</p>
           </div>
 
           <div className="bg-[#1a1a1f] border border-gray-800 rounded-lg p-6">
             <p className="text-gray-400 text-sm">Categories</p>
             <p className="text-3xl font-bold mt-2">
-              {new Set(products.map((p) => p.category)).size}
+              {new Set(visibleProducts.map((p) => p.category)).size}
             </p>
           </div>
 
           <div className="bg-[#1a1a1f] border border-gray-800 rounded-lg p-6">
             <p className="text-gray-400 text-sm">Total Value</p>
             <p className="text-3xl font-bold mt-2">
-              ${products.reduce((sum, p) => sum + p.price, 0)}
+              ${visibleProducts.reduce((sum, p) => sum + p.price, 0)}
             </p>
           </div>
         </div>
@@ -213,7 +277,10 @@ export default function SellerDashboard() {
 
           {/* Product List */}
           <div className="space-y-3">
-            {products.map((product) => (
+            {sellerProductsLoading && (
+              <p className="text-sm text-gray-400">Loading your products...</p>
+            )}
+            {!sellerProductsLoading && visibleProducts.map((product) => (
               <div
                 key={product.id}
                 className="bg-[#1a1a1f] border border-gray-800 rounded-lg p-4 flex items-center gap-4"

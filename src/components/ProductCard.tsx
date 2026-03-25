@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Product } from "../types";
 import { useCart } from "../hooks/useContext";
 import { useNavigate } from "react-router-dom";
+import { trackBehaviorEvent } from "../services/behavior";
 
 interface Props extends Product {}
 
@@ -65,6 +66,13 @@ export default function ProductCard({
       inStock: true,
     };
     addToCart(product);
+    void trackBehaviorEvent({
+      action: "cart",
+      productId: Number.parseInt(id, 10),
+      query: name,
+      score: 1.5,
+      context: { source: "product-card" },
+    });
   };
 
   const handleOpenProduct = () => {
@@ -75,6 +83,13 @@ export default function ProductCard({
       localStorage.setItem("recentlyViewedProducts", JSON.stringify(updated));
       setIsRecentlyViewed(true);
     }
+    void trackBehaviorEvent({
+      action: "click",
+      productId: Number.parseInt(id, 10),
+      query: name,
+      score: 1.1,
+      context: { source: "product-card" },
+    });
     navigate(`/product/${id}`);
   };
 

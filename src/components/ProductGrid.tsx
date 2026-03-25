@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import ProductCard from "./ProductCard";
 import { useProducts } from "../context/ProductContext";
 import { ProductCategory, ProductFilters } from "../types";
 import { Filter, Star, X } from "lucide-react";
 import { PRODUCT_CATEGORIES } from "../constants/categories";
+import { trackBehaviorEvent } from "../services/behavior";
 
 const mapUiCategoryToDbCategories = (category?: ProductCategory): string[] => {
   if (!category) return [];
@@ -69,7 +70,8 @@ export default function ProductGrid({ initialCategory }: ProductGridProps) {
     { label: "Top Rated", value: "rating" },
   ];
 
-  const { products, loading } = useProducts();
+  const { products, loading, error, fetchProducts } = useProducts();
+  const lastTrackedFilterSignature = useRef<string>("");
 
   const brandOptions = useMemo(() => {
     const brandSet = new Set<string>();
@@ -154,6 +156,39 @@ export default function ProductGrid({ initialCategory }: ProductGridProps) {
     if (type === "rating") setMinRating(0);
     if (type === "brand" && value) setSelectedBrands((prev) => prev.filter((b) => b !== value));
   };
+
+  useEffect(() => {
+    const filterSignature = JSON.stringify({
+      category: filters.category ?? "all",
+      search: filters.search?.trim().toLowerCase() || "",
+      price: filters.priceRange,
+      sortBy,
+      inStockOnly,
+      onSaleOnly,
+      minRating,
+      selectedBrands: [...selectedBrands].sort(),
+      resultCount: filteredProducts.length,
+    });
+
+    if (filterSignature === lastTrackedFilterSignature.current) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      lastTrackedFilterSignature.current = filterSignature;
+      void trackBehaviorEvent({
+        action: "search",
+        query: `shop:${filterSignature}`,
+        score: 0.8,
+        context: {
+          source: "shop-grid",
+          visible_results: filteredProducts.length,
+        },
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [filters, filteredProducts.length, inStockOnly, minRating, onSaleOnly, selectedBrands, sortBy]);
 
   const renderFilterPanel = () => (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -369,6 +404,19 @@ export default function ProductGrid({ initialCategory }: ProductGridProps) {
               </div>
             ))}
           </div>
+        ) : error ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 rounded-2xl border border-rose-700/40 bg-gradient-to-b from-rose-950/25 to-[#0b0b0d]">
+            <p className="text-rose-200 text-xl font-semibold">Could not load products right now</p>
+            <p className="text-slate-300 mt-2">{error}</p>
+            <button
+              onClick={() => {
+                void fetchProducts(filters.category);
+              }}
+              className="mt-6 premium-button-primary"
+            >
+              Retry
+            </button>
+          </motion.div>
         ) : filteredProducts.length > 0 ? (
           <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProducts.map((product, index) => (

@@ -1,6 +1,6 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Product } from "../types";
-import { API_BASE_URL } from "../config/api";
+import { API_BASE_URL, getApiBaseCandidates } from "../config/api";
 
 type ProductContextType = {
   products: Product[];
@@ -55,13 +55,31 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
       if (category) {
         query.set("category", category);
       }
-      const endpoint = query.toString() ? `${API_BASE_URL}/products?${query.toString()}` : `${API_BASE_URL}/products`;
+      const apiCandidates = getApiBaseCandidates();
+      let data: ApiProduct[] | null = null;
+      let lastError = "Unknown error";
 
-      const response = await fetch(endpoint);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch products: ${response.status}`);
+      for (const baseUrl of apiCandidates) {
+        const endpoint = query.toString() ? `${baseUrl}/products?${query.toString()}` : `${baseUrl}/products`;
+        try {
+          const response = await fetch(endpoint);
+          if (!response.ok) {
+            lastError = `Failed to fetch products: ${response.status} (${baseUrl})`;
+            continue;
+          }
+          const payload = (await response.json()) as ApiProduct[];
+          data = payload;
+          break;
+        } catch (candidateError) {
+          const message = candidateError instanceof Error ? candidateError.message : "Request failed";
+          lastError = `${message} (${baseUrl})`;
+        }
       }
-      const data: ApiProduct[] = await response.json();
+
+      if (!data) {
+        throw new Error(lastError);
+      }
+
       if (requestId !== requestIdRef.current) {
         return;
       }

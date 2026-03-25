@@ -46,6 +46,8 @@ const botGreeting: ChatMessage = {
 const imageFallback =
   "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=400&q=80";
 
+const MAX_PRODUCTS_PER_MESSAGE = 6;
+
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -125,7 +127,7 @@ export default function Chatbot() {
 
       const data: AgentResponse = await res.json();
       const products = [...(data.results ?? []), ...(data.recommendations ?? [])];
-      const uniqueProducts = Array.from(new Map(products.map((p) => [p.id, p])).values());
+      const uniqueProducts = Array.from(new Map(products.map((p) => [p.id, p])).values()).slice(0, MAX_PRODUCTS_PER_MESSAGE);
 
       // Fake typing delay for a more conversational feel.
       await new Promise((resolve) => setTimeout(resolve, 500));

@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import { useCart } from "../hooks/useContext";
 import { useAuth } from "../hooks/useContext";
 import { API_BASE_URL } from "../config/api";
+import { trackBehaviorEvent } from "../services/behavior";
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -14,6 +15,12 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [confirmedSummary, setConfirmedSummary] = useState<{
+    subtotal: number;
+    shipping: number;
+    tax: number;
+    total: number;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -80,6 +87,18 @@ export default function CheckoutPage() {
 
       const createdOrder: { id: number } = await response.json();
       setOrderId(String(createdOrder.id));
+      void trackBehaviorEvent({
+        action: "purchase",
+        productId: undefined,
+        query: `order_${createdOrder.id}`,
+        score: 2.2,
+        userId: numericUserId,
+        context: {
+          source: "checkout",
+          total: finalTotal,
+          items_count: cart.items.reduce((sum, item) => sum + item.quantity, 0),
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Checkout failed";
       alert(message);
@@ -89,6 +108,14 @@ export default function CheckoutPage() {
 
     setIsProcessing(false);
     setPaymentSuccess(true);
+
+    // Snapshot values before cart reset so confirmation reflects actual paid total.
+    setConfirmedSummary({
+      subtotal: cartTotal,
+      shipping: shippingCost,
+      tax: taxCost,
+      total: finalTotal,
+    });
 
     // Clear cart after successful payment
     clearCart();
@@ -121,19 +148,23 @@ export default function CheckoutPage() {
               <div className="grid grid-cols-2 gap-4 text-left">
                 <div>
                   <p className="text-gray-400 text-sm">Subtotal</p>
-                  <p className="font-semibold">${cartTotal.toFixed(2)}</p>
+                  <p className="font-semibold">${(confirmedSummary?.subtotal ?? cartTotal).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Shipping</p>
-                  <p className="font-semibold">{shippingCost === 0 ? "FREE" : `$${shippingCost}`}</p>
+                  <p className="font-semibold">
+                    {(confirmedSummary?.shipping ?? shippingCost) === 0
+                      ? "FREE"
+                      : `$${(confirmedSummary?.shipping ?? shippingCost).toFixed(2)}`}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Tax</p>
-                  <p className="font-semibold">${taxCost.toFixed(2)}</p>
+                  <p className="font-semibold">${(confirmedSummary?.tax ?? taxCost).toFixed(2)}</p>
                 </div>
                 <div className="border-t border-gray-700 pt-2">
                   <p className="text-gray-400 text-sm">Total</p>
-                  <p className="font-bold text-[#C8102E] text-lg">${finalTotal.toFixed(2)}</p>
+                  <p className="font-bold text-[#C8102E] text-lg">${(confirmedSummary?.total ?? finalTotal).toFixed(2)}</p>
                 </div>
               </div>
             </div>
