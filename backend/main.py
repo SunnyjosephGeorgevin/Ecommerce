@@ -25,6 +25,7 @@ from backend.routes.orders import router as orders_router
 from backend.routes.products import router as products_router
 from backend.routes.recommendations import router as recommendations_router
 from backend.routes.seller import router as seller_router
+from backend.routes.system_status import router as system_status_router
 from backend.routes.users import router as users_router
 
 from backend.routes.agent import router as agent_router
@@ -172,3 +173,4 @@ app.include_router(agent_router)
 app.include_router(behavior_router)
 app.include_router(feedback_router)
 app.include_router(recommendations_router)
+app.include_router(system_status_router)
