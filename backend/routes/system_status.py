@@ -18,6 +18,18 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 SYSTEM_FLAGS = {
     "maintenance_mode": False,
 }
+STATUS_OVERRIDES: dict[str, str] = {
+    "database": "auto",
+    "cloud_storage": "auto",
+    "behavior_dataset": "auto",
+    "recommendation_engine": "auto",
+    "nlp_chatbot": "auto",
+    "realtime_pipeline": "auto",
+    "personalization": "auto",
+    "catalog_api": "auto",
+    "feedback_system": "auto",
+    "web_assistant_ui": "auto",
+}
 
 
 def _ensure_admin(db: Session, admin_email: str | None) -> None:
@@ -38,6 +50,15 @@ def _check_storage_connection() -> tuple[bool, str, str]:
         return False, "Unavailable", str(exc)
 
 
+def _apply_override(target: str, computed: bool) -> tuple[bool, str]:
+    mode = STATUS_OVERRIDES.get(target, "auto")
+    if mode == "down":
+        return False, "override-down"
+    if mode == "up":
+        return True, "override-up"
+    return computed, "live-probe"
+
+
 @router.get("/system-status")
 def get_system_status(
     db: Session = Depends(get_db),
@@ -53,10 +74,15 @@ def get_system_status(
         db_connected = False
         db_error = str(exc)
 
-    product_count = db.query(Product).count()
-    behavior_count = db.query(UserBehavior).count()
-    feedback_count = db.query(Feedback).count()
-    avg_rating = db.query(text("COALESCE(AVG(rating), 0) FROM feedback")).scalar() or 0
+    product_count = 0
+    behavior_count = 0
+    feedback_count = 0
+    avg_rating = 0
+    if db_connected:
+        product_count = db.query(Product).count()
+        behavior_count = db.query(UserBehavior).count()
+        feedback_count = db.query(Feedback).count()
+        avg_rating = db.query(text("COALESCE(AVG(rating), 0) FROM feedback")).scalar() or 0
 
     storage_ok, storage_backend, storage_detail = _check_storage_connection()
 
@@ -83,59 +109,110 @@ def get_system_status(
 
     recent_events = pipeline.get_recent_events(limit=20)
 
+    db_ready, db_source = _apply_override("database", db_connected)
+    storage_ready, storage_source = _apply_override("cloud_storage", storage_ok)
+    behavior_ready, behavior_source = _apply_override("behavior_dataset", db_ready)
+    recommendation_ready, recommendation_source = _apply_override("recommendation_engine", recommendation_error is None)
+    nlp_ready, nlp_source = _apply_override("nlp_chatbot", nlp_ok)
+    realtime_ready, realtime_source = _apply_override("realtime_pipeline", True)
+    personalization_ready, personalization_source = _apply_override("personalization", recommendation_error is None)
+    catalog_ready, catalog_source = _apply_override("catalog_api", product_count > 0)
+    feedback_ready, feedback_source = _apply_override("feedback_system", True)
+    web_assistant_computed = recommendation_ready and nlp_ready
+    web_assistant_ready, web_assistant_source = _apply_override("web_assistant_ui", web_assistant_computed)
+
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "infrastructure": {
             "database": {
-                "connected": db_connected,
+                "connected": db_ready,
                 "engine": engine.dialect.name,
                 "error": db_error,
+                "operational_source": db_source,
             },
             "cloud_storage": {
-                "connected": storage_ok,
+                "connected": storage_ready,
                 "backend": storage_backend,
                 "detail": storage_detail,
+                "operational_source": storage_source,
             },
         },
         "platform_controls": {
             "maintenance_mode": SYSTEM_FLAGS["maintenance_mode"],
         },
+        "status_overrides": STATUS_OVERRIDES,
         "features": {
             "behavior_dataset": {
-                "ready": db_connected,
+                "ready": behavior_ready,
                 "event_count": behavior_count,
+                "operational_source": behavior_source,
             },
             "recommendation_engine": {
-                "ready": recommendation_error is None,
+                "ready": recommendation_ready,
                 "sample_count": len(recommendation_sample),
                 "error": recommendation_error,
+                "operational_source": recommendation_source,
             },
             "nlp_chatbot": {
-                "ready": nlp_ok,
+                "ready": nlp_ready,
                 "intent": detected_intent,
                 "category": extracted_category,
                 "error": nlp_error,
+                "operational_source": nlp_source,
             },
             "realtime_pipeline": {
-                "ready": True,
+                "ready": realtime_ready,
                 "recent_events": len(recent_events),
                 "current_version_user_1": pipeline.get_version(sample_user_id),
+                "operational_source": realtime_source,
             },
             "personalization": {
-                "ready": recommendation_error is None,
+                "ready": personalization_ready,
                 "sample_user": sample_user_id,
                 "sample_count": len(recommendation_sample),
+                "operational_source": personalization_source,
             },
             "catalog_api": {
-                "ready": product_count > 0,
+                "ready": catalog_ready,
                 "product_count": product_count,
+                "operational_source": catalog_source,
             },
             "feedback_system": {
-                "ready": True,
+                "ready": feedback_ready,
                 "feedback_count": feedback_count,
                 "average_rating": round(float(avg_rating), 2),
+                "operational_source": feedback_source,
+            },
+            "web_assistant_ui": {
+                "ready": web_assistant_ready,
+                "depends_on": ["recommendation_engine", "nlp_chatbot"],
+                "operational_source": web_assistant_source,
             },
         },
+    }
+
+
+@router.post("/status-overrides/{target}")
+def set_status_override(
+    target: str,
+    mode: str,
+    db: Session = Depends(get_db),
+    x_admin_email: str | None = Header(default=None),
+):
+    _ensure_admin(db, x_admin_email)
+
+    if target not in STATUS_OVERRIDES:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown status target")
+
+    normalized_mode = mode.strip().lower()
+    if normalized_mode not in {"auto", "up", "down"}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Mode must be auto, up, or down")
+
+    STATUS_OVERRIDES[target] = normalized_mode
+    return {
+        "target": target,
+        "mode": normalized_mode,
+        "status_overrides": STATUS_OVERRIDES,
     }
 
 

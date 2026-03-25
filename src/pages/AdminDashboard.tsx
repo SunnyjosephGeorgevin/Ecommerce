@@ -45,6 +45,7 @@ type SystemStatusResponse = {
   platform_controls?: {
     maintenance_mode: boolean;
   };
+  status_overrides?: Record<string, string>;
   features: {
     behavior_dataset: StatusEntry;
     recommendation_engine: StatusEntry;
@@ -53,6 +54,7 @@ type SystemStatusResponse = {
     personalization: StatusEntry;
     catalog_api: StatusEntry;
     feedback_system: StatusEntry;
+    web_assistant_ui: StatusEntry;
   };
 };
 
@@ -65,6 +67,9 @@ export default function AdminDashboard() {
   const [systemStatus, setSystemStatus] = useState<SystemStatusResponse | null>(null);
   const [controlBusy, setControlBusy] = useState<string | null>(null);
   const [controlMessage, setControlMessage] = useState<string | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState("database");
+  const [evidenceTitle, setEvidenceTitle] = useState<string | null>(null);
+  const [evidenceDetails, setEvidenceDetails] = useState<string[]>([]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -154,8 +159,18 @@ export default function AdminDashboard() {
   const totalUsers = users.length;
   const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
 
-  const renderStatusPill = (label: string, ok: boolean, detail?: string) => (
-    <div className="rounded-lg border border-gray-800 bg-[#0B0B0D] p-3">
+  const renderStatusPill = (label: string, ok: boolean, detail?: string, payload?: StatusEntry) => (
+    <button
+      type="button"
+      onClick={() => {
+        const details = Object.entries(payload ?? {})
+          .map(([key, value]) => `${key.replace(/_/g, " ")}: ${String(value)}`)
+          .slice(0, 8);
+        setEvidenceTitle(label);
+        setEvidenceDetails(detail ? [detail, ...details] : details);
+      }}
+      className="rounded-lg border border-gray-800 bg-[#0B0B0D] p-3 text-left hover:border-slate-600 transition"
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-slate-200">{label}</p>
         <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ${ok ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}>
@@ -164,7 +179,7 @@ export default function AdminDashboard() {
         </span>
       </div>
       {detail && <p className="mt-1 text-xs text-slate-400 line-clamp-2">{detail}</p>}
-    </div>
+    </button>
   );
 
   const renderFeaturePill = (label: string, payload: StatusEntry | undefined) => {
@@ -174,7 +189,7 @@ export default function AdminDashboard() {
       .filter(([key]) => key !== "ready" && key !== "connected")
       .slice(0, 3)
       .map(([key, value]) => `${key.replace(/_/g, " ")}: ${String(value)}`);
-    return renderStatusPill(label, ok, detailParts.join(" • "));
+    return renderStatusPill(label, ok, detailParts.join(" • "), payload);
   };
 
   const callAdminControl = async (path: string, method: "GET" | "POST" = "POST") => {
@@ -191,6 +206,20 @@ export default function AdminDashboard() {
     }
 
     return response.json();
+  };
+
+  const handleStatusOverride = async (mode: "auto" | "up" | "down") => {
+    setControlBusy(`override-${mode}`);
+    setControlMessage(null);
+    try {
+      const result = await callAdminControl(`/admin/status-overrides/${selectedTarget}?mode=${mode}`);
+      setControlMessage(`Override updated: ${result.target} -> ${result.mode}`);
+      await fetchDashboardData();
+    } catch (error) {
+      setControlMessage(error instanceof Error ? error.message : "Failed to update override");
+    } finally {
+      setControlBusy(null);
+    }
   };
 
   const handleMaintenanceMode = async () => {
@@ -332,17 +361,28 @@ export default function AdminDashboard() {
                   {renderStatusPill(
                     `Database (${systemStatus.infrastructure.database.engine})`,
                     systemStatus.infrastructure.database.connected,
-                    systemStatus.infrastructure.database.error || "Database connection healthy"
+                    systemStatus.infrastructure.database.error || "Database connection healthy",
+                    {
+                      connected: systemStatus.infrastructure.database.connected,
+                      engine: systemStatus.infrastructure.database.engine,
+                      error: systemStatus.infrastructure.database.error || null,
+                    }
                   )}
                   {renderStatusPill(
                     `Cloud Storage (${systemStatus.infrastructure.cloud_storage.backend})`,
                     systemStatus.infrastructure.cloud_storage.connected,
-                    systemStatus.infrastructure.cloud_storage.detail
+                    systemStatus.infrastructure.cloud_storage.detail,
+                    {
+                      connected: systemStatus.infrastructure.cloud_storage.connected,
+                      backend: systemStatus.infrastructure.cloud_storage.backend,
+                      detail: systemStatus.infrastructure.cloud_storage.detail,
+                    }
                   )}
                   {renderStatusPill(
                     "Maintenance Mode",
                     !Boolean(systemStatus.platform_controls?.maintenance_mode),
-                    systemStatus.platform_controls?.maintenance_mode ? "Platform is currently in maintenance mode" : "Platform is in normal operation mode"
+                    systemStatus.platform_controls?.maintenance_mode ? "Platform is currently in maintenance mode" : "Platform is in normal operation mode",
+                    { maintenance_mode: Boolean(systemStatus.platform_controls?.maintenance_mode) }
                   )}
                 </div>
               </div>
@@ -357,8 +397,17 @@ export default function AdminDashboard() {
                   {renderFeaturePill("Personalization", systemStatus.features.personalization)}
                   {renderFeaturePill("Product Catalog API", systemStatus.features.catalog_api)}
                   {renderFeaturePill("Feedback System", systemStatus.features.feedback_system)}
-                  {renderStatusPill("Cloud Storage", systemStatus.infrastructure.cloud_storage.connected, systemStatus.infrastructure.cloud_storage.detail)}
-                  {renderStatusPill("Web Assistant UI", true, "Chatbot and personalized sections are enabled in web UI")}
+                  {renderStatusPill(
+                    "Cloud Storage",
+                    systemStatus.infrastructure.cloud_storage.connected,
+                    systemStatus.infrastructure.cloud_storage.detail,
+                    {
+                      connected: systemStatus.infrastructure.cloud_storage.connected,
+                      backend: systemStatus.infrastructure.cloud_storage.backend,
+                      detail: systemStatus.infrastructure.cloud_storage.detail,
+                    }
+                  )}
+                  {renderFeaturePill("Web Assistant UI", systemStatus.features.web_assistant_ui)}
                 </div>
               </div>
             </>
@@ -501,6 +550,71 @@ export default function AdminDashboard() {
           {controlMessage && (
             <p className="mb-4 rounded-lg border border-slate-700 bg-[#0B0B0D] px-3 py-2 text-sm text-slate-200">{controlMessage}</p>
           )}
+          <div className="mb-4 rounded-lg border border-slate-800 bg-[#0B0B0D] p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Operational Simulation (For Dot Testing)</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={selectedTarget}
+                onChange={(e) => setSelectedTarget(e.target.value)}
+                className="rounded-md border border-slate-700 bg-[#131a28] px-3 py-2 text-sm text-slate-100"
+              >
+                {[
+                  "database",
+                  "cloud_storage",
+                  "behavior_dataset",
+                  "recommendation_engine",
+                  "nlp_chatbot",
+                  "realtime_pipeline",
+                  "personalization",
+                  "catalog_api",
+                  "feedback_system",
+                  "web_assistant_ui",
+                ].map((key) => (
+                  <option key={key} value={key}>{key}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void handleStatusOverride("down")}
+                disabled={Boolean(controlBusy)}
+                className="rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Force Red
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleStatusOverride("up")}
+                disabled={Boolean(controlBusy)}
+                className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Force Green
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleStatusOverride("auto")}
+                disabled={Boolean(controlBusy)}
+                className="rounded-md bg-slate-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Restore Live Probe
+              </button>
+              {systemStatus?.status_overrides && (
+                <span className="text-xs text-slate-400">Current mode: {systemStatus.status_overrides[selectedTarget] || "auto"}</span>
+              )}
+            </div>
+          </div>
+
+          {evidenceTitle && (
+            <div className="mb-4 rounded-lg border border-slate-800 bg-[#0B0B0D] p-3">
+              <p className="text-sm font-semibold text-slate-200">Operational Evidence: {evidenceTitle}</p>
+              <div className="mt-2 space-y-1">
+                {evidenceDetails.length === 0 && <p className="text-xs text-slate-400">No evidence available.</p>}
+                {evidenceDetails.map((item, index) => (
+                  <p key={`${item}-${index}`} className="text-xs text-slate-300">{item}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               {
