@@ -4,7 +4,7 @@ import sys
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(CURRENT_DIR)
 
-# Allow imports like backend.database even when running from backend/ as cwd.
+
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 
@@ -33,11 +33,11 @@ from backend.seed_products import products as full_seed_products
 
 from backend.models.user_behavior import UserBehavior
 
-# ✅ Create tables
+
 Base.metadata.create_all(bind=engine)
 
 
-# 🔧 Ensure schema updates safely
+
 def ensure_schema() -> None:
     db: Session = SessionLocal()
     try:
@@ -74,11 +74,11 @@ def ensure_schema() -> None:
 
 
 
-# 🔥 SAFE SEEDING (NO DUPLICATES)
+
 def seed_defaults() -> None:
     db: Session = SessionLocal()
     try:
-        # 👉 Run ONLY if DB is empty (best practice)
+        
         if db.query(User).count() == 0:
 
             db.add_all([

@@ -95,9 +95,9 @@ export default function LoginPage() {
               <p className="text-gray-500">
                 <span className="font-semibold">Seller:</span> seller@demo.com
               </p>
-              <p className="text-gray-500">
-                <span className="font-semibold">Admin:</span> admin@demo.com
-              </p>
+              
+                
+              
             </div>
           </div>
 
